@@ -27,6 +27,8 @@
 	var/obj/item/paper/fluff/jobs/cargo/manifest/manifest
 	var/radius_2 = 1.35
 	var/static/list/animation_math //assoc list with pre calculated values
+	var/can_stack = TRUE
+	var/list/crates = list()
 
 /obj/structure/closet/crate/Initialize(mapload)
 	. = ..()
@@ -59,6 +61,13 @@
 				add_overlay("[icon_door]_door")
 			else
 				add_overlay("[icon_state]_door")
+		var/current_offset = 11
+		for(var/V in crates)
+			var/obj/structure/closet/crate/C = V
+			var/mutable_appearance/crate_overlay = mutable_appearance(C.icon, C.icon_state)
+			crate_overlay.pixel_y = current_offset
+			add_overlay(crate_overlay)
+			current_offset += 11
 	else
 		layer = BELOW_OBJ_LAYER
 		if(!is_animating_door)
@@ -135,7 +144,41 @@
 	AddElement(/datum/element/climbable, climb_time = crate_climb_time, climb_stun = 0)
 */
 
+/obj/structure/closet/crate/proc/stack_crate(atom/movable/CR, mob/living/user)
+	var/obj/structure/closet/crate/newcrate = CR
+	if(!opened && !newcrate.opened && crates.len <6)
+		crates += newcrate
+		to_chat(user, "<span class='notice'>You put [newcrate] on top of [src].</span>")
+		update_icon()
+		//find a way to remove CR
+		anchored = TRUE
+	if(crates.len >=5)
+		to_chat(user, "<span class='danger'>Stacking more crates would be unsafe!</span>")
+		// add disperse crates
+		return
+	else
+		to_chat(user, "<span class='notice'>Close the crates first!</span>")
+
+/obj/structure/closet/crate/MouseDrop_T(atom/movable/CR, mob/living/user)
+	if(istype(CR, /obj/structure/closet/crate))
+		stack_crate(CR)
+		to_chat(user, "<span class='notice'>The logic works.</span>")
+		return
+	else
+		. = ..()
+
+
+
 /obj/structure/closet/crate/open(mob/living/user)
+	if(crates.len >=1)
+		to_chat(user, "<span class='notice'>You remove the top crate from the stack.</span>")
+		var/obj/structure/closet/crate/C = crates[crates.len]
+		C.forceMove(user.loc)
+		crates.Cut()
+		update_icon()
+		if(crates.len <1)
+			anchored = FALSE
+		return
 	. = ..()
 	if(. && manifest)
 		to_chat(user, "<span class='notice'>The manifest is torn off [src].</span>")
